@@ -1,56 +1,105 @@
-// nrf24_reliable_datagram_server.pde
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple addressed, reliable messaging server
-// with the RHReliableDatagram class, using the RH_NRF24 driver to control a NRF24 radio.
-// It is designed to work with the other example nrf24_reliable_datagram_client
-// Tested on Uno with Sparkfun WRL-00691 NRF24L01 module
-// Tested on Teensy with Sparkfun WRL-00691 NRF24L01 module
-// Tested on Anarduino Mini (http://www.anarduino.com/mini/) with RFM73 module
-// Tested on Arduino Mega with Sparkfun WRL-00691 NRF25L01 module
-
-#include <RHReliableDatagram.h>
-#include <RH_NRF24.h>
 #include <SPI.h>
+#include <NRFLite.h>
 
-#define CLIENT_ADDRESS 1
-#define SERVER_ADDRESS 2
+int LeftStick_Left =0;
+int LeftStick_Right =0;
+int LeftStick_Up =0;
+int LeftStick_Down =0;
+int RightStick_Left =0;
+int RightStick_Right =0;
+int RightStick_Up =0;
+int RightStick_Down =0;
 
-// Singleton instance of the radio driver
-RH_NRF24 driver(9, 10);
-// RH_NRF24 driver(8, 7);   // For RFM73 on Anarduino Mini
+struct JoyData {
+  byte LeftStick_Left;
+  byte LeftStick_Right;
+  byte LeftStick_Up;
+  byte LeftStick_Down;
+  byte RightStick_Left;
+  byte RightStick_Right;
+  byte RightStick_Up;
+  byte RightStick_Down;
+};
 
-// Class to manage message delivery and receipt, using the driver declared above
-RHReliableDatagram manager(driver, SERVER_ADDRESS);
+JoyData data;
 
-void setup() 
+const static uint8_t RADIO_ID = 0;
+const static uint8_t DESTINATION_RADIO_ID = 1;
+const static uint8_t PIN_RADIO_CE = 9;
+const static uint8_t PIN_RADIO_CSN = 10;
+
+enum RadioPacketType
 {
-  Serial.begin(9600);
-  if (!manager.init())
-    Serial.println("init failed");
-  // Defaults after init are 2.402 GHz (channel 2), 2Mbps, 0dBm
-}
+    Heartbeat,
+    BeginGetData,
+    EndGetData,
+    ReceiverData,
+    JoyData
+};
 
-uint8_t data[] = "And hello back to you";
-// Dont put this on the stack:
-uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
+struct RadioPacket
+{
+    RadioPacketType PacketType;
+    uint8_t FromRadioId;
+    uint32_t OnTimeMillis;
+    uint32_t JoyData;
+};
+
+NRFLite _radio;
+uint32_t _lastMessageSendTime;
+
+void setup()
+{
+    Serial.begin(115200);
+
+    if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN))
+    {
+        Serial.println("Cannot communicate with radio");
+        while (1); // Wait here forever.
+    }
+}
 
 void loop()
 {
-  if (manager.available())
-  {
-    // Wait for a message addressed to us from the client
-    uint8_t len = sizeof(buf);
-    uint8_t from;
-    if (manager.recvfromAck(buf, &len, &from))
+    while (_radio.hasData())
     {
-      Serial.print("got request from : 0x");
-      Serial.print(from, HEX);
-      Serial.print(": ");
-      Serial.println((char*)buf);
+        RadioPacket radioData;
+        _radio.readData(&radioData);
 
-      // Send a reply back to the originator client
-      if (!manager.sendtoWait(data, sizeof(data), from))
-        Serial.println("sendtoWait failed");
+            String LeftJoy = "LeftJoystick";
+            LeftJoy += data.LeftStick_Left;
+            LeftJoy += data.LeftStick_Right;
+            LeftJoy += data.LeftStick_Up;
+            LeftJoy += data.LeftStick_Down;
+            Serial.println(LeftJoy);
+    
+            String RightJoy = "RightJoystick";
+            RightJoy += data.LeftStick_Left;
+            RightJoy += data.LeftStick_Right;
+            RightJoy += data.LeftStick_Up;
+            RightJoy += data.LeftStick_Down;
+            Serial.println(RightJoy);
+        
+            
+        if (radioData.PacketType == BeginGetData)
+        {
+
+           
+            Serial.println("Received data request, adding ACK packet");
+
+            RadioPacket ackData;
+            ackData.PacketType = ReceiverData;
+            ackData.FromRadioId = RADIO_ID;
+            ackData.OnTimeMillis = millis();
+
+            // Add the data to send back to the transmitter.
+            // The next packet we receive will be acknowledged with this data.
+            _radio.addAckData(&ackData, sizeof(ackData));
+        }
+        else if (radioData.PacketType == EndGetData)
+        {
+            // The transmitter hopefully received the acknowledgement data packet at this point.
+        }
     }
-  }
 }
+
