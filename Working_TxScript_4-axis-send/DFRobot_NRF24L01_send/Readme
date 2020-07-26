@@ -1,1 +1,0 @@
-This sketch is used with the twin joystick and successfully maps each axis. Each direction is it's own signal, so Y has a (0 - 100) axis and a (0 - -100).
