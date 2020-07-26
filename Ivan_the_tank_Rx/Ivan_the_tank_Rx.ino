@@ -5,12 +5,12 @@
 
 
 // Defining the inputs on the Motor control shield, and assigning them a Digital pin. 
-#define enA 2;
-#define in1 3;
-#define in2 4;
-#define in3 5;
-#define in4 6;
-#define enB 7;
+#define enA 2
+#define in1 3
+#define in2 4
+#define in3 5
+#define in4 6
+#define enB 7
 
 // This is engaging the radio and setting the ID and the tranmission pipeline. Must match the Transmitter
 const uint64_t pipeIn = 0xE8E8F0F0E1LL;
